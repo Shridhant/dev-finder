@@ -1,16 +1,13 @@
 {
-  "homepage": "https://Shridhant.github.io/dev-finder"
-  "name": "githb",
+  "homepage": "https://Shridhant.github.io/dev-finder",
+
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d build",
-    "dev": "vite",
-    "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+   " build": "vite build",
+  "preview": "vite preview",
+  "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
     "react": "^18.3.1",
