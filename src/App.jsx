@@ -6,24 +6,25 @@ function App() {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
+  const [repos, setRepos] = useState([]);
+  const [page, setPage] = useState(1); // Page for pagination
+  const [totalPages, setTotalPages] = useState(0); // Fix total pages calculation
 
-  // Debounce the searchTerm with useEffect
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
     }, 300); // 300ms debounce delay
 
-    // Cleanup function to clear the timeout if searchTerm changes
     return () => {
       clearTimeout(timer);
     };
   }, [searchTerm]);
 
-  // useEffect to fetch data when debouncedSearchTerm changes
   useEffect(() => {
     if (debouncedSearchTerm) {
       async function fetchData() {
         try {
+          // Fetch user profile
           const res = await fetch(
             `https://api.github.com/users/${debouncedSearchTerm}`
           );
@@ -32,11 +33,19 @@ function App() {
           }
           const data = await res.json();
           setResults(data);
+          setError(null);
 
-          setError(null); // Clear any previous errors
+          // Calculate total pages
+          const calculatedTotalPages = Math.ceil(data.public_repos / 5);
+          setTotalPages(calculatedTotalPages);
+
+          // Fetch repositories for the first page
+          fetchRepos(1, data.login);
         } catch (err) {
           setError(err.message);
-          setResults(null); // Clear previous results
+          setResults(null);
+          setRepos([]);
+          setTotalPages(0);
         }
       }
 
@@ -44,44 +53,64 @@ function App() {
     }
   }, [debouncedSearchTerm]);
 
-  // Handle the input search term change
+  const fetchRepos = async (pageNum, login) => {
+    try {
+      const reposRes = await fetch(
+        `https://api.github.com/users/${login || debouncedSearchTerm}/repos?page=${pageNum}&per_page=5` // 5 repos per page
+      );
+      if (!reposRes.ok) {
+        throw new Error(`Failed to fetch repositories.`);
+      }
+      const reposData = await reposRes.json();
+      setRepos(reposData);
+    } catch (err) {
+      setError("Error fetching repositories");
+      setRepos([]);
+    }
+  };
+
   const handleSearch = useCallback((inputValue) => {
     setSearchTerm(inputValue);
   }, []);
 
+  const handleNextPage = () => {
+    const nextPage = page + 1;
+    if (nextPage <= totalPages) {
+      setPage(nextPage);
+      fetchRepos(nextPage, results?.login);
+    }
+  };
+
+  const handlePrevPage = () => {
+    const prevPage = page - 1;
+    if (prevPage > 0) {
+      setPage(prevPage);
+      fetchRepos(prevPage, results?.login);
+    }
+  };
+
   return (
-    <div>
-      <h1
-        className="text-center font-extrabold mt-5"
-        style={{
-          fontFamily: "'ITC Souvenir Std Demi', sans-serif",
-          fontSize: "4rem", // Make sure to wrap values with units in quotes
-          fontWeight: "bold",
-          lineHeight: 1.2,
-          color: "#333",
-          textShadow: "2px 2px 5px rgba(0, 0, 0, 0.2)",
-          letterSpacing: "0.05em",
-        }}
-      >
+    <div className="min-h-screen bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">
+      <h1 className="text-center font-extrabold mt-5 text-4xl sm:text-5xl md:text-6xl text-gray-800 shadow-sm">
         DEV.FINDER
       </h1>
 
       <Input gitsearch={handleSearch} />
-      <div className="results mt-5 text-center">
+      <div className="results mt-5 text-center px-4">
         {error && <p className="text-red-500">{error}</p>}
         {results && (
-          <div className="flex p-2 max-w-sm mx-auto bg-white border border-gray-200 rounded-lg shadow-md overflow-hidden mt-5">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start p-4 max-w-lg mx-auto bg-white border border-gray-200 rounded-lg shadow-md overflow-hidden mt-5 space-y-4 sm:space-y-0 sm:space-x-4">
             <img
-              className="w-32 h-32 rounded-full object-cover"
+              className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover"
               src={results.avatar_url}
               alt={`${results.login}'s avatar`}
             />
-            <div className="p-5 text-center">
-              <h2 className="text-xl font-semibold text-gray-800">
+            <div className="text-center sm:text-left">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
                 {results.name || "No Name Provided"}
               </h2>
               <p className="text-gray-500 mb-2">@{results.login}</p>
-              <div className="flex justify-center gap-4 mt-4">
+              <div className="flex justify-center sm:justify-start gap-6 mt-4">
                 <div>
                   <p className="text-gray-700 font-semibold">
                     {results.followers}
@@ -109,6 +138,61 @@ function App() {
               >
                 View Profile
               </a>
+            </div>
+          </div>
+        )}
+
+        {/* Repositories Section */}
+        {repos.length > 0 && (
+          <div className="repos mt-10 mx-auto max-w-4xl">
+            <h2 className="text-xl font-bold mb-5 text-gray-800">Repositories</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {repos.map((repo) => (
+                <div
+                  key={repo.id}
+                  className="bg-gray-100 p-4 rounded-md shadow hover:shadow-lg transition"
+                >
+                  <h3 className="text-lg font-semibold text-blue-600">
+                    <a
+                      href={repo.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                    >
+                      {repo.name}
+                    </a>
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-2">
+                    {repo.description || "No description available."}
+                  </p>
+                  <div className="flex justify-between items-center mt-4 text-sm text-gray-500">
+                    <span>⭐ {repo.stargazers_count}</span>
+                    <span>🍴 {repo.forks_count}</span>
+                    <span>🔄 {repo.language || "N/A"}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex justify-center items-center gap-4 mt-6">
+              <button
+                onClick={handlePrevPage}
+                disabled={page === 1}
+                className="px-4 py-2 bg-gray-200 text-gray-600 rounded-md hover:bg-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-gray-600">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={handleNextPage}
+                disabled={page === totalPages}
+                className="px-4 py-2 bg-gray-200 text-gray-600 rounded-md hover:bg-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
             </div>
           </div>
         )}
